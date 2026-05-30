@@ -63,7 +63,7 @@ export default function Navbar() {
           <div className="hidden sm:flex items-center gap-1.5">
 
             {/* ADMIN and RECRUITER see Jobs */}
-            {['ADMIN', 'RECRUITER'].includes(role) && (
+            {['ADMIN', 'RECRUITER', 'INTERVIEWER'].includes(role) && (
               <Link
                 href="/dashboard/jobs"
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${

@@ -19,6 +19,19 @@ datasource db {
 // Enums are finite lists of allowed values.
 // Using an enum instead of a plain String prevents typos like "recruter" slipping in.
 
+enum InterviewType {
+  PHONE_SCREEN
+  TECHNICAL
+  FINAL_ROUND
+}
+
+enum Recommendation {
+  STRONG_HIRE
+  HIRE
+  NO_HIRE
+  STRONG_NO_HIRE
+}
+
 enum Role {
   ADMIN        // Can do everything: close jobs, view analytics, manage users
   RECRUITER    // Can create jobs and move candidates through stages
@@ -158,11 +171,25 @@ model Scorecard {
   reviewerId    String
   reviewer      User        @relation("Reviewer", fields: [reviewerId], references: [id])
 
-  rating        Int
-  // Must be 1–5 — we enforce this in the API route with Zod, not at DB level
+  // New structural parameters representing specific interview segments
+  interviewType    InterviewType
+  recommendation   Recommendation
 
+  // Multi-criteria raw matrix blocks (Integer range 1-5 validated at Zod layer)
+  technicalAbility Int
+  communication    Int
+  problemSolving   Int
+  cultureFit       Int
+
+  // Aggregated arithmetic baseline score for historical summary metrics
+  rating        Int
+
+  // Split qualitative text logs
+  strengths     String      @db.Text
+  concerns      String      @db.Text
+
+  // Retained legacy fallback field to maintain backwards compatibility maps
   feedback      String      @db.Text
-  // Free-text notes from the interviewer
 
   createdAt DateTime @default(now())
 }

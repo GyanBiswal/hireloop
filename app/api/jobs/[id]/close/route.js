@@ -10,6 +10,7 @@ import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import prisma from '@/lib/prisma'
 
 export async function PATCH(request, { params }) {
+  const { id } = await params
   const session = await getServerSession(authOptions)
 
   // Only ADMIN can close jobs — RECRUITER cannot
@@ -17,7 +18,7 @@ export async function PATCH(request, { params }) {
     return Response.json({ error: 'Forbidden — ADMIN only' }, { status: 403 })
   }
 
-  const job = await prisma.job.findUnique({ where: { id: params.id } })
+  const job = await prisma.job.findUnique({ where: { id: id } })
   if (!job) return Response.json({ error: 'Job not found' }, { status: 404 })
 
   if (job.status === 'CLOSED') {
@@ -25,7 +26,7 @@ export async function PATCH(request, { params }) {
   }
 
   const updated = await prisma.job.update({
-    where: { id: params.id },
+    where: { id: id },
     data:  { status: 'CLOSED' },
   })
 

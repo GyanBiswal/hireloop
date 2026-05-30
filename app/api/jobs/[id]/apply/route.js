@@ -7,6 +7,7 @@
 
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
+import { sendApplicationReceivedEmail } from '@/lib/email'
 
 // Zod validation for the apply form submission
 const applySchema = z.object({
@@ -128,6 +129,13 @@ export async function POST(req, context) {
       })
 
       return newApplication
+    })
+
+    sendApplicationReceivedEmail({
+      candidateName:  name,
+      // Use your own email while testing — free tier only delivers to verified addresses
+      candidateEmail: process.env.NODE_ENV === 'production' ? email : process.env.TEST_EMAIL,
+      jobTitle:       job.title,
     })
 
     return Response.json(

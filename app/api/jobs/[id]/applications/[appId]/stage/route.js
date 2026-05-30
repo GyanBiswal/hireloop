@@ -14,6 +14,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import prisma from '@/lib/prisma'
 import { z } from 'zod'
+import { sendStageMovedEmail } from '@/lib/email'
 
 const moveStageSchema = z.object({
   // The ID of the stage we're moving TO
@@ -96,6 +97,22 @@ export async function PATCH(request, context) {
         note:          note || null,
       },
     })
+
+    const appWithCandidate = await prisma.application.findUnique({
+      where: { id: appId },
+      include: {
+        candidate: { select: { name: true, email: true } },
+        job:       { select: { title: true } },
+      },
+    })
+
+    sendStageMovedEmail({
+      candidateName:  appWithCandidate.candidate.name,
+      candidateEmail: appWithCandidate.candidate.email,
+      jobTitle:       appWithCandidate.job.title,
+      stageName:      targetStage.name,
+    })
+    // NOTE: no await — intentional. See lib/email.js for why.
 
     return updatedApp
   })

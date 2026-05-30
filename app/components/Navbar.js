@@ -31,7 +31,7 @@ export default function Navbar() {
   const hiddenRoutes = ['/', '/login', '/signup']
 
   if (hiddenRoutes.includes(pathname)) {
-      return null
+    return null
   }
 
   // While the session is loading, show a minimal placeholder to avoid layout shift
@@ -62,7 +62,7 @@ export default function Navbar() {
           {/* Navigation links — shown based on role */}
           <div className="hidden sm:flex items-center gap-1.5">
 
-            {/* ADMIN and RECRUITER see Jobs */}
+            {/* ALL roles see Jobs */}
             {['ADMIN', 'RECRUITER', 'INTERVIEWER'].includes(role) && (
               <Link
                 href="/dashboard/jobs"
@@ -90,18 +90,30 @@ export default function Navbar() {
               </Link>
             )}
 
-            {/* ADMIN-only link */}
+            {/* ADMIN-only navigation block links */}
             {role === 'ADMIN' && (
-              <Link
-                href="/admin"
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                  isActive('/admin')
-                    ? 'bg-slate-900 text-white border border-slate-800'
-                    : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
-                }`}
-              >
-                Admin Panel
-              </Link>
+              <>
+                <Link
+                  href="/dashboard/analytics"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    isActive('/dashboard/analytics')
+                      ? 'bg-slate-900 text-white border border-slate-800'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
+                  }`}
+                >
+                  Analytics
+                </Link>
+                <Link
+                  href="/admin"
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    isActive('/admin')
+                      ? 'bg-slate-900 text-white border border-slate-800'
+                      : 'text-slate-400 hover:text-white hover:bg-slate-900/50'
+                  }`}
+                >
+                  Admin Panel
+                </Link>
+              </>
             )}
           </div>
         </div>

@@ -1,23 +1,76 @@
-// prisma/schema.prisma
-// Defines EVERY table in the database.
-// Prisma reads this file to generate both the SQL migration and the JS client.
-// Think of it as the single source of truth for your data model.
-
 generator client {
-  // Tells Prisma to generate a JavaScript/Node.js client
   provider = "prisma-client-js"
 }
 
 datasource db {
-  // In Prisma v7, the connection URL is no longer set here.
-  // It moved to prisma.config.ts at the project root.
-  // This block now only declares the SQL dialect.
   provider = "postgresql"
 }
 
-// ─── ENUMS ────────────────────────────────────────────────────────────────────
-// Enums are finite lists of allowed values.
-// Using an enum instead of a plain String prevents typos like "recruter" slipping in.
+model User {
+  id         String        @id @default(cuid())
+  name       String
+  email      String        @unique
+  password   String
+  role       Role          @default(RECRUITER)
+  createdAt  DateTime      @default(now())
+  referrals  Application[] @relation("Referrer")
+  auditLogs  AuditLog[]    @relation("Actor")
+  jobs       Job[]         @relation("CreatedBy")
+  scorecards Scorecard[]   @relation("Reviewer")
+}
+
+model Job {
+  id             String          @id @default(cuid())
+  title          String
+  department     String
+  description    String
+  location       String
+  status         JobStatus       @default(DRAFT)
+  createdById    String
+  createdAt      DateTime        @default(now())
+  applications   Application[]
+  createdBy      User            @relation("CreatedBy", fields: [createdById], references: [id])
+  pipelineStages PipelineStage[]
+}
+
+model PipelineStage {
+  id            String        @id @default(cuid())
+  name          String
+  order         Int
+  color         String
+  jobId         String
+  applications  Application[] @relation("CurrentStage")
+  auditLogsFrom AuditLog[]    @relation("FromStage")
+  auditLogsTo   AuditLog[]    @relation("ToStage")
+  job           Job           @relation(fields: [jobId], references: [id], onDelete: Cascade)
+}
+
+model Candidate {
+  id           String        @id @default(cuid())
+  name         String
+  email        String        @unique
+  phone        String
+  resumeUrl    String?
+  createdAt    DateTime      @default(now())
+  applications Application[]
+}
+
+model Application {
+  id             String            @id @default(cuid())
+  candidateId    String
+  jobId          String
+  currentStageId String
+  referrerId     String?
+  status         ApplicationStatus @default(ACTIVE)
+  appliedAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  candidate      Candidate         @relation(fields: [candidateId], references: [id])
+  currentStage   PipelineStage     @relation("CurrentStage", fields: [currentStageId], references: [id])
+  job            Job               @relation(fields: [jobId], references: [id])
+  referrer       User?             @relation("Referrer", fields: [referrerId], references: [id])
+  auditLogs      AuditLog[]
+  scorecards     Scorecard[]
+}
 
 enum InterviewType {
   PHONE_SCREEN
@@ -32,190 +85,60 @@ enum Recommendation {
   STRONG_NO_HIRE
 }
 
-enum Role {
-  ADMIN        // Can do everything: close jobs, view analytics, manage users
-  RECRUITER    // Can create jobs and move candidates through stages
-  INTERVIEWER  // Read-only + can submit scorecards for assigned candidates
-}
-
-enum JobStatus {
-  DRAFT   // Being written, not visible to applicants yet
-  OPEN    // Accepting applications
-  CLOSED  // No longer hiring; applications are locked
-}
-
-enum ApplicationStatus {
-  ACTIVE    // Candidate is still being considered
-  REJECTED  // Candidate has been turned down
-  HIRED     // Offer accepted — the pipeline ends here
-}
-
-// ─── MODELS ───────────────────────────────────────────────────────────────────
-
-model User {
-  id        String   @id @default(cuid())
-  // cuid() generates a unique collision-resistant ID (better than auto-increment for distributed DBs)
-
-  name      String
-  email     String   @unique
-  // @unique creates a database-level UNIQUE INDEX so two users can't share an email
-
-  password  String
-  // NEVER store plain text — we will hash this with bcryptjs before saving
-
-  role      Role     @default(RECRUITER)
-  // New users default to RECRUITER; an admin can promote them later
-
-  createdAt DateTime @default(now())
-
-  // Relations — Prisma uses these to generate JOIN helpers on the client
-  jobs         Job[]        @relation("CreatedBy")   // Jobs this user created
-  scorecards   Scorecard[]  @relation("Reviewer")    // Scorecards this user wrote
-  auditLogs    AuditLog[]   @relation("Actor")       // Stage moves this user performed
-  referrals    Application[] @relation("Referrer")   // Candidates this user referred
-}
-
-model Job {
-  id          String    @id @default(cuid())
-  title       String
-  department  String
-  description String    @db.Text
-  // @db.Text maps to PostgreSQL TEXT (unlimited length) instead of VARCHAR(191)
-
-  location    String
-  status      JobStatus @default(DRAFT)
-
-  createdById String
-  // Foreign key — stores the User.id of whoever created this job
-
-  createdBy   User      @relation("CreatedBy", fields: [createdById], references: [id])
-  // Prisma relation: fields:[createdById] in THIS table → references:[id] in User
-
-  createdAt   DateTime  @default(now())
-
-  pipelineStages PipelineStage[] // Each job has its own ordered list of stages
-  applications   Application[]   // All applications submitted for this job
-}
-
-model PipelineStage {
-  id     String @id @default(cuid())
-  name   String
-  // Human-readable: "Applied", "Phone Screen", "Technical Interview", etc.
-
-  order  Int
-  // Determines left-to-right position on the Kanban board (1 = leftmost)
-
-  color  String
-  // Hex color string (e.g. "#6366f1") used to render the stage badge in the UI
-
-  jobId  String
-  job    Job    @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  // onDelete: Cascade → if the Job is deleted, all its stages are deleted too
-
-  applications Application[] @relation("CurrentStage")
-  // All applications currently sitting in this stage
-
-  // AuditLog relations — a stage can appear as the "from" or "to" in a move
-  auditLogsFrom AuditLog[] @relation("FromStage")
-  auditLogsTo   AuditLog[] @relation("ToStage")
-}
-
-model Candidate {
-  id        String  @id @default(cuid())
-  name      String
-  email     String  @unique
-  phone     String
-  resumeUrl String?
-  // Optional — candidate might not attach a resume at apply time
-
-  createdAt DateTime @default(now())
-
-  applications Application[]
-  // One candidate can apply to multiple jobs (e.g. reapplying later)
-}
-
-model Application {
-  id             String            @id @default(cuid())
-
-  candidateId    String
-  candidate      Candidate         @relation(fields: [candidateId], references: [id])
-
-  jobId          String
-  job            Job               @relation(fields: [jobId], references: [id])
-
-  currentStageId String
-  currentStage   PipelineStage     @relation("CurrentStage", fields: [currentStageId], references: [id])
-  // Tracks EXACTLY which stage this candidate is in right now
-
-  referrerId     String?
-  referrer       User?             @relation("Referrer", fields: [referrerId], references: [id])
-  // Optional: if an employee referred this person, we track it here.
-  // Business rule: the referrer CANNOT also be the interviewer (conflict of interest)
-
-  status         ApplicationStatus @default(ACTIVE)
-
-  appliedAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  // @updatedAt → Prisma automatically sets this to NOW() on every update
-
-  scorecards Scorecard[]
-  auditLogs  AuditLog[]
-}
-
 model Scorecard {
-  id            String      @id @default(cuid())
+  id                String @id @default(cuid())
+  applicationId     String
+  reviewerId        String
 
-  applicationId String
-  application   Application @relation(fields: [applicationId], references: [id])
+  interviewType     InterviewType
+  recommendation    Recommendation
 
-  reviewerId    String
-  reviewer      User        @relation("Reviewer", fields: [reviewerId], references: [id])
+  technicalAbility  Int
+  communication     Int
+  problemSolving    Int
+  cultureFit        Int
 
-  // New structural parameters representing specific interview segments
-  interviewType    InterviewType
-  recommendation   Recommendation
+  strengths         String?
+  concerns          String?
 
-  // Multi-criteria raw matrix blocks (Integer range 1-5 validated at Zod layer)
-  technicalAbility Int
-  communication    Int
-  problemSolving   Int
-  cultureFit       Int
+  rating            Int
+  feedback          String
 
-  // Aggregated arithmetic baseline score for historical summary metrics
-  rating        Int
+  createdAt         DateTime @default(now())
 
-  // Split qualitative text logs
-  strengths     String      @db.Text
-  concerns      String      @db.Text
-
-  // Retained legacy fallback field to maintain backwards compatibility maps
-  feedback      String      @db.Text
-
-  createdAt DateTime @default(now())
+  application       Application @relation(fields: [applicationId], references: [id])
+  reviewer          User @relation("Reviewer", fields: [reviewerId], references: [id])
 }
 
 model AuditLog {
-  id            String        @id @default(cuid())
-
+  id            String         @id @default(cuid())
   applicationId String
-  application   Application   @relation(fields: [applicationId], references: [id])
-
   actorId       String
-  actor         User          @relation("Actor", fields: [actorId], references: [id])
-  // Who performed this action (the logged-in user at the time)
-
   fromStageId   String?
-  fromStage     PipelineStage? @relation("FromStage", fields: [fromStageId], references: [id])
-  // NULL on the very first "Applied" event (no previous stage)
-
   toStageId     String?
-  toStage       PipelineStage? @relation("ToStage", fields: [toStageId], references: [id])
-
   action        String
-  // Short verb: "STAGE_MOVE", "REJECTED", "HIRED", "APPLIED", etc.
-
   note          String?
-  // Optional recruiter comment when moving a stage
+  createdAt     DateTime       @default(now())
+  actor         User           @relation("Actor", fields: [actorId], references: [id])
+  application   Application    @relation(fields: [applicationId], references: [id])
+  fromStage     PipelineStage? @relation("FromStage", fields: [fromStageId], references: [id])
+  toStage       PipelineStage? @relation("ToStage", fields: [toStageId], references: [id])
+}
 
-  createdAt DateTime @default(now())
+enum Role {
+  ADMIN
+  RECRUITER
+  INTERVIEWER
+}
+
+enum JobStatus {
+  DRAFT
+  OPEN
+  CLOSED
+}
+
+enum ApplicationStatus {
+  ACTIVE
+  REJECTED
+  HIRED
 }

@@ -13,6 +13,7 @@ import { redirect, notFound } from 'next/navigation'
 import prisma from '@/lib/prisma'
 import Link from 'next/link'
 import ScorecardForm from '@/app/components/ScorecardForm'
+import ApplicationStatusButtons from '@/app/components/ApplicationStatusButtons'
 
 // Status badge colors
 // Remapped to high-contrast dark mode alpha tracking tokens
@@ -31,7 +32,7 @@ function Stars({ rating }) {
 }
 
 export default async function ApplicationDetailPage({ params }) {
-    const { appId } = await params
+  const { appId } = await params
   const session = await getServerSession(authOptions)
   if (!session) redirect('/login')
 
@@ -108,8 +109,10 @@ export default async function ApplicationDetailPage({ params }) {
               )}
             </div>
 
+            {/* Right-side status tracking and action console */}
             <div className="flex flex-col items-end gap-2.5 self-start sm:self-center">
-              {/* Application status */}
+              
+              {/* Application status badge */}
               <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-md border ${STATUS_STYLES[application.status]}`}>
                 {application.status}
               </span>
@@ -122,13 +125,24 @@ export default async function ApplicationDetailPage({ params }) {
                 {application.currentStage.name}
               </span>
 
-              {/* Average rating */}
+              {/* Average rating summary box */}
               {avgRating && (
-                <div className="flex items-center gap-2 mt-1.5 bg-slate-950 border border-slate-800/60 px-2 py-1 rounded-lg">
+                <div className="flex items-center gap-2 mt-0.5 bg-slate-950 border border-slate-800/60 px-2 py-1 rounded-lg shadow-sm">
                   <Stars rating={Math.round(Number(avgRating))} />
                   <span className="text-[10px] font-semibold tracking-wide text-slate-400 font-mono">
                     {avgRating} / 5.0
                   </span>
+                </div>
+              )}
+
+              {/* ── NEW: Hire / Reject buttons — only for ADMIN and RECRUITER ── */}
+              {['ADMIN', 'RECRUITER'].includes(session.user.role) && (
+                <div className="mt-2 pt-2 border-t border-slate-800/60 w-full flex justify-end">
+                  <ApplicationStatusButtons
+                    jobId={application.job.id}
+                    appId={application.id}
+                    currentStatus={application.status}
+                  />
                 </div>
               )}
             </div>
@@ -151,13 +165,14 @@ export default async function ApplicationDetailPage({ params }) {
                 </div>
               ) : alreadyReviewed ? (
                 <div className="p-3.5 rounded-xl border border-slate-800 bg-slate-950/40 text-xs font-medium text-slate-400 leading-relaxed">
-                  &; Identity configuration verified. Your scorecard criteria for this candidate track has been saved to the database.
+                  &amp;; Identity configuration verified. Your scorecard criteria for this candidate track has been saved to the database.
                 </div>
               ) : (
-                // ScorecardForm is a client component (needs state for star selection)
+                // ScorecardForm is a client component (needs state for selection breakdown)
                 <ScorecardForm
                   jobId={application.job.id}
                   appId={application.id}
+                  candidateName={application.candidate.name}
                 />
               )}
             </div>
@@ -175,7 +190,7 @@ export default async function ApplicationDetailPage({ params }) {
                         <span className="text-xs font-bold text-slate-200">{sc.reviewer.name}</span>
                         <Stars rating={sc.rating} />
                       </div>
-                      <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/40 border border-slate-800/40 rounded-xl p-2.5">
+                      <p className="text-xs text-slate-400 leading-relaxed bg-slate-950/40 border border-slate-800/40 rounded-xl p-2.5 whitespace-pre-wrap">
                         {sc.feedback}
                       </p>
                       <p className="text-[10px] font-semibold font-mono text-slate-500 mt-2">
